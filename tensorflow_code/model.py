@@ -4,8 +4,10 @@
 # @Author : {ZM7}
 # @File : model.py
 # @Software: PyCharm
-import tensorflow as tf
+# import tensorflow as tf
 import math
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 
 
 class Model(object):

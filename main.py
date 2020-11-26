@@ -6,9 +6,9 @@
 # @Software: PyCharm
 
 from __future__ import division
+from tensorflow_code.model import *
+from tensorflow_code.utils import build_graph, Data, split_validation
 import numpy as np
-from model import *
-from utils import build_graph, Data, split_validation
 import pickle
 import argparse
 import datetime
@@ -27,8 +27,8 @@ parser.add_argument('--nonhybrid', action='store_true', help='global preference'
 parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay rate')
 parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay')
 opt = parser.parse_args()
-train_data = pickle.load(open('../datasets/' + opt.dataset + '/train.txt', 'rb'))
-test_data = pickle.load(open('../datasets/' + opt.dataset + '/test.txt', 'rb'))
+train_data = pickle.load(open('./datasets/' + opt.dataset + '/train.txt', 'rb'))
+test_data = pickle.load(open('./datasets/' + opt.dataset + '/test.txt', 'rb'))
 # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
 if opt.dataset == 'diginetica':
     n_node = 43098
@@ -40,8 +40,9 @@ else:
 train_data = Data(train_data, sub_graph=True, method=opt.method, shuffle=True)
 test_data = Data(test_data, sub_graph=True, method=opt.method, shuffle=False)
 model = GGNN(hidden_size=opt.hiddenSize, out_size=opt.hiddenSize, batch_size=opt.batchSize, n_node=n_node,
-                 lr=opt.lr, l2=opt.l2,  step=opt.step, decay=opt.lr_dc_step * len(train_data.inputs) / opt.batchSize, lr_dc=opt.lr_dc,
-                 nonhybrid=opt.nonhybrid)
+             lr=opt.lr, l2=opt.l2, step=opt.step, decay=opt.lr_dc_step * len(train_data.inputs) / opt.batchSize,
+             lr_dc=opt.lr_dc,
+             nonhybrid=opt.nonhybrid)
 print(opt)
 best_result = [0, 0]
 best_epoch = [0, 0]
@@ -53,15 +54,15 @@ for epoch in range(opt.epoch):
     loss_ = []
     for i, j in zip(slices, np.arange(len(slices))):
         adj_in, adj_out, alias, item, mask, targets = train_data.get_slice(i)
-        _, loss, _ = model.run(fetches, targets, item, adj_in, adj_out, alias,  mask)
+        _, loss, _ = model.run(fetches, targets, item, adj_in, adj_out, alias, mask)
         loss_.append(loss)
     loss = np.mean(loss_)
     slices = test_data.generate_batch(model.batch_size)
     print('start predicting: ', datetime.datetime.now())
-    hit, mrr, test_loss_ = [], [],[]
+    hit, mrr, test_loss_ = [], [], []
     for i, j in zip(slices, np.arange(len(slices))):
         adj_in, adj_out, alias, item, mask, targets = test_data.get_slice(i)
-        scores, test_loss = model.run([model.score_test, model.loss_test], targets, item, adj_in, adj_out, alias,  mask)
+        scores, test_loss = model.run([model.score_test, model.loss_test], targets, item, adj_in, adj_out, alias, mask)
         test_loss_.append(test_loss)
         index = np.argsort(scores, 1)[:, -20:]
         for score, target in zip(index, targets):
@@ -69,15 +70,15 @@ for epoch in range(opt.epoch):
             if len(np.where(score == target - 1)[0]) == 0:
                 mrr.append(0)
             else:
-                mrr.append(1 / (20-np.where(score == target - 1)[0][0]))
-    hit = np.mean(hit)*100
-    mrr = np.mean(mrr)*100
+                mrr.append(1 / (20 - np.where(score == target - 1)[0][0]))
+    hit = np.mean(hit) * 100
+    mrr = np.mean(mrr) * 100
     test_loss = np.mean(test_loss_)
     if hit >= best_result[0]:
         best_result[0] = hit
         best_epoch[0] = epoch
     if mrr >= best_result[1]:
         best_result[1] = mrr
-        best_epoch[1]=epoch
-    print('train_loss:\t%.4f\ttest_loss:\t%4f\tRecall@20:\t%.4f\tMMR@20:\t%.4f\tEpoch:\t%d,\t%d'%
+        best_epoch[1] = epoch
+    print('train_loss:\t%.4f\ttest_loss:\t%4f\tRecall@20:\t%.4f\tMMR@20:\t%.4f\tEpoch:\t%d,\t%d' %
           (loss, test_loss, best_result[0], best_result[1], best_epoch[0], best_epoch[1]))
