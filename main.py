@@ -13,7 +13,7 @@ import pickle
 import argparse
 import datetime
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser()      #读取命令行参数
 parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
 parser.add_argument('--method', type=str, default='ggnn', help='ggnn/gat/gcn')
 parser.add_argument('--validation', action='store_true', help='validation')
@@ -27,8 +27,10 @@ parser.add_argument('--nonhybrid', action='store_true', help='global preference'
 parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay rate')
 parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay')
 opt = parser.parse_args()
-train_data = pickle.load(open('./datasets/' + opt.dataset + '/train.txt', 'rb'))
+
+train_data = pickle.load(open('./datasets/' + opt.dataset + '/train.txt', 'rb'))    #读取数据文件反序列化为对象
 test_data = pickle.load(open('./datasets/' + opt.dataset + '/test.txt', 'rb'))
+
 # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
 if opt.dataset == 'diginetica':
     n_node = 43098
@@ -43,12 +45,12 @@ model = GGNN(hidden_size=opt.hiddenSize, out_size=opt.hiddenSize, batch_size=opt
              lr=opt.lr, l2=opt.l2, step=opt.step, decay=opt.lr_dc_step * len(train_data.inputs) / opt.batchSize,
              lr_dc=opt.lr_dc,
              nonhybrid=opt.nonhybrid)
-print(opt)
 best_result = [0, 0]
 best_epoch = [0, 0]
+
 for epoch in range(opt.epoch):
     print('epoch: ', epoch, '===========================================')
-    slices = train_data.generate_batch(model.batch_size)
+    slices = train_data.generate_batch(model.batch_size)    #返回Batch序列[[0,1,2],[3,4,5]]这样，可能打乱原序列顺序
     fetches = [model.opt, model.loss_train, model.global_step]
     print('start training: ', datetime.datetime.now())
     loss_ = []
