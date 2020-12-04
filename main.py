@@ -48,31 +48,33 @@ model = GGNN(hidden_size=opt.hiddenSize, out_size=opt.hiddenSize, batch_size=opt
 best_result = [0, 0]
 best_epoch = [0, 0]
 
+print("1????\n\n\n")
+
 for epoch in range(opt.epoch):
     print('epoch: ', epoch, '===========================================')
     slices = train_data.generate_batch(model.batch_size)    #返回Batch序列[[0,1,2],[3,4,5]]这样，可能打乱原序列顺序
-    fetches = [model.opt, model.loss_train, model.global_step]
+    fetches = [model.opt, model.loss_train, model.global_step]  # opt为训练得到的最优参数，loss_train损失函数值，global_step最终迭代轮数
     print('start training: ', datetime.datetime.now())
     loss_ = []
     for i, j in zip(slices, np.arange(len(slices))):
         adj_in, adj_out, alias, item, mask, targets = train_data.get_slice(i)
+        print(type(adj_in),"adj_in???\n\n\n\n")
         _, loss, _ = model.run(fetches, targets, item, adj_in, adj_out, alias, mask)
         loss_.append(loss)
-    loss = np.mean(loss_)
     slices = test_data.generate_batch(model.batch_size)
     print('start predicting: ', datetime.datetime.now())
     hit, mrr, test_loss_ = [], [], []
     for i, j in zip(slices, np.arange(len(slices))):
         adj_in, adj_out, alias, item, mask, targets = test_data.get_slice(i)
-        scores, test_loss = model.run([model.score_test, model.loss_test], targets, item, adj_in, adj_out, alias, mask)
+        scores, test_loss = model.run([model.score_test, model.loss_test], targets, item, adj_in, adj_out, alias, mask) # 预测时更新计算分数值和损失函数值
         test_loss_.append(test_loss)
-        index = np.argsort(scores, 1)[:, -20:]
+        index = np.argsort(scores, 1)[:, -20:] #取每行后20个
         for score, target in zip(index, targets):
-            hit.append(np.isin(target - 1, score))
+            hit.append(np.isin(target - 1, score)) #命中
             if len(np.where(score == target - 1)[0]) == 0:
                 mrr.append(0)
             else:
-                mrr.append(1 / (20 - np.where(score == target - 1)[0][0]))
+                mrr.append(1 / (20 - np.where(score == target - 1)[0][0]))  #越后面分越高
     hit = np.mean(hit) * 100
     mrr = np.mean(mrr) * 100
     test_loss = np.mean(test_loss_)
