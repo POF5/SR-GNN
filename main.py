@@ -58,7 +58,6 @@ for epoch in range(opt.epoch):
     loss_ = []
     for i, j in zip(slices, np.arange(len(slices))):
         adj_in, adj_out, alias, item, mask, targets = train_data.get_slice(i)
-        print(type(adj_in),"adj_in???\n\n\n\n")
         _, loss, _ = model.run(fetches, targets, item, adj_in, adj_out, alias, mask)
         loss_.append(loss)
     slices = test_data.generate_batch(model.batch_size)

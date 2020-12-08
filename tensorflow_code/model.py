@@ -40,32 +40,34 @@ class Model(object):
         rm = tf.reduce_sum(self.mask, 1)  # mask每一行分别求和
         last_id = tf.gather_nd(self.alias,
                                tf.stack([tf.range(self.batch_size), tf.to_int32(rm) - 1], axis=1))  # 取序列最后一个的id
-        last_h = tf.gather_nd(re_embedding, tf.stack([tf.range(self.batch_size), last_id], axis=1)) # 取最后一个节点的嵌入向量
+        last_h = tf.gather_nd(re_embedding, tf.stack([tf.range(self.batch_size), last_id], axis=1)) # 取最后一个节点的嵌入向量 batch_size*hidden_size
         seq_h = tf.stack([tf.nn.embedding_lookup(re_embedding[i], self.alias[i]) for i in range(self.batch_size)],
-                         axis=0)  # batch_size*T*d
-        last = tf.matmul(last_h, self.nasr_w1)   # w1*vn
-        seq = tf.matmul(tf.reshape(seq_h, [-1, self.out_size]), self.nasr_w2)   #w2*vi
-        last = tf.reshape(last, [self.batch_size, 1, -1])
-        m = tf.nn.sigmoid(last + tf.reshape(seq, [self.batch_size, -1, self.out_size]) + self.nasr_b) # 取激活函数sigmoid
-        coef = tf.matmul(tf.reshape(m, [-1, self.out_size]), self.nasr_v, transpose_b=True) * tf.reshape(   # sg
-            self.mask, [-1, 1])
-        b = self.embedding[1:]
+                         axis=0)  # batch_size*T*d  //batch_size*maxlen*hidden_size
+        last = tf.matmul(last_h, self.nasr_w1)   # w1*vn , batch_size*hidden_size
+        seq = tf.matmul(tf.reshape(seq_h, [-1, self.out_size]), self.nasr_w2)   # w2*vi , (batch_size*maxlen)*hidden_size
+        last = tf.reshape(last, [self.batch_size, 1, -1]) # batch_size * 1 * hidden_size
+        m = tf.nn.sigmoid(last + tf.reshape(seq, [self.batch_size, -1, self.out_size]) + self.nasr_b) # 取激活函数sigmoid , batch_size*maxlen*out_size
+        coef = tf.matmul(tf.reshape(m, [-1, self.out_size]), self.nasr_v, transpose_b=True) * tf.reshape(   # sg(未求和) , (batch_size*maxlen)*out_size
+            self.mask, [-1, 1]) # coef: (batch_size*maxlen)*1
+        b = self.embedding[1:] # n_node*out_size
         if not self.nonhybrid:  # 拼接si和sg
-            ma = tf.concat([tf.reduce_sum(tf.reshape(coef, [self.batch_size, -1, 1]) * seq_h, 1),
-                            tf.reshape(last, [-1, self.out_size])], -1)
+            ma = tf.concat([tf.reduce_sum(tf.reshape(coef, [self.batch_size, -1, 1]) * seq_h, 1), #batch_size*out_size  (为什么要乘一个seq_h再求和?
+                            tf.reshape(last, [-1, self.out_size])], -1) # ma: batch_size*(2*out_size) ==论文中的sh
             self.B = tf.get_variable('B', [2 * self.out_size, self.out_size],
                                      initializer=tf.random_uniform_initializer(-self.stdv, self.stdv))
-            y1 = tf.matmul(ma, self.B)
-            logits = tf.matmul(y1, b, transpose_b=True)
+            y1 = tf.matmul(ma, self.B)  # batch_size*out_size
+            logits = tf.matmul(y1, b, transpose_b=True) # batch_size*n_node
+            # print(y1, "logits?????\n\n\n\n\n")
         else:   # 仅用sg
             ma = tf.reduce_sum(tf.reshape(coef, [self.batch_size, -1, 1]) * seq_h, 1)
             logits = tf.matmul(ma, b, transpose_b=True)
+
         loss = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.tar - 1, logits=logits))
         self.vars = tf.trainable_variables()
         if train:
             lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in self.vars if v.name not
-                               in ['bias', 'gamma', 'b', 'g', 'beta']]) * self.L2
+                               in ['bias', 'gamma', 'b', 'g', 'beta']]) * self.L2 #正则化
             loss = loss + lossL2
         return loss, logits
 
