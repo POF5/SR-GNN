@@ -78,6 +78,7 @@ for epoch in range(opt.epoch):
                 mrr.append(1 / (20 - np.where(score == target - 1)[0][0]))  #越后面分越高
     hit = np.mean(hit) * 100
     mrr = np.mean(mrr) * 100
+    print(hit,mrr,"??????\n\n\n\n\n")
     test_loss = np.mean(test_loss_)
     if hit >= best_result[0]:
         saver.save(model.sess, "Model/model.ckpt")
