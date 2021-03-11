@@ -236,10 +236,21 @@ elif opt.dataset == 'yoochoose':
     pickle.dump(seq64, open('yoochoose1_64/all_train_seq.txt', 'wb'))
 
 else:
+
     if not os.path.exists('sample'):
         os.makedirs('sample')
-    pickle.dump(tra, open('sample/train.txt', 'wb'))
-    pickle.dump(tes, open('sample/test.txt', 'wb'))
-    pickle.dump(tra_seqs, open('sample/all_train_seq.txt', 'wb'))
+        Max = 0
+        for i in tra[0]:
+            for j in i:
+                if j > Max:
+                    Max = j
+        for i in tes[0]:
+            for j in i:
+                if j > Max:
+                    Max = j
+        print(Max,"???????\n\n\n\n\n")
+    # pickle.dump(tra, open('sample/train.txt', 'wb'),0)
+    # pickle.dump(tes, open('sample/test.txt', 'wb'),0)
+    # pickle.dump(tra_seqs, open('sample/all_train_seq.txt', 'wb'),0)
 
 print('Done.')

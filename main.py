@@ -12,6 +12,7 @@ import numpy as np
 import pickle
 import argparse
 import datetime
+import tensorflow.compat.v1 as tf
 
 parser = argparse.ArgumentParser()      #读取命令行参数
 parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
@@ -28,8 +29,8 @@ parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate deca
 parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay')
 opt = parser.parse_args()
 
-train_data = pickle.load(open('./datasets/' + opt.dataset + '/train.txt', 'rb'))    #读取数据文件反序列化为对象
-test_data = pickle.load(open('./datasets/' + opt.dataset + '/test.txt', 'rb'))
+train_data = pickle.load(open('./datasets/' + opt.dataset + '/train_all.txt', 'rb'))    #读取数据文件反序列化为对象
+test_data = pickle.load(open('./datasets/' + opt.dataset + '/test_all.txt', 'rb'))
 
 # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
 if opt.dataset == 'diginetica':
@@ -37,7 +38,8 @@ if opt.dataset == 'diginetica':
 elif opt.dataset == 'yoochoose1_64' or opt.dataset == 'yoochoose1_4':
     n_node = 37484
 else:
-    n_node = 310
+    #TODO :先获取数据集节点总个数
+    n_node = 65349 #节点总个数
 # g = build_graph(all_train_seq)
 train_data = Data(train_data, sub_graph=True, method=opt.method, shuffle=True)
 test_data = Data(test_data, sub_graph=True, method=opt.method, shuffle=False)
@@ -47,8 +49,7 @@ model = GGNN(hidden_size=opt.hiddenSize, out_size=opt.hiddenSize, batch_size=opt
              nonhybrid=opt.nonhybrid)
 best_result = [0, 0]
 best_epoch = [0, 0]
-
-print("1????\n\n\n")
+saver = tf.train.Saver()
 
 for epoch in range(opt.epoch):
     print('epoch: ', epoch, '===========================================')
@@ -68,6 +69,7 @@ for epoch in range(opt.epoch):
         scores, test_loss = model.run([model.score_test, model.loss_test], targets, item, adj_in, adj_out, alias, mask) # 预测时更新计算分数值和损失函数值
         test_loss_.append(test_loss)
         index = np.argsort(scores, 1)[:, -20:] #取每行后20个
+        # print(len(index[0]),"??????\n\n\n\n\n\n\n\n")
         for score, target in zip(index, targets):
             hit.append(np.isin(target - 1, score)) #命中
             if len(np.where(score == target - 1)[0]) == 0:
@@ -78,10 +80,14 @@ for epoch in range(opt.epoch):
     mrr = np.mean(mrr) * 100
     test_loss = np.mean(test_loss_)
     if hit >= best_result[0]:
+        saver.save(model.sess, "Model/model.ckpt")
+        print("save model...")
         best_result[0] = hit
         best_epoch[0] = epoch
+
     if mrr >= best_result[1]:
         best_result[1] = mrr
         best_epoch[1] = epoch
     print('train_loss:\t%.4f\ttest_loss:\t%4f\tRecall@20:\t%.4f\tMMR@20:\t%.4f\tEpoch:\t%d,\t%d' %
           (loss, test_loss, best_result[0], best_result[1], best_epoch[0], best_epoch[1]))
+print(best_result[0],best_result[1])

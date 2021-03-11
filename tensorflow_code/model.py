@@ -13,9 +13,6 @@ tf.disable_v2_behavior()
 
 class Model(object):
     def __init__(self, hidden_size=100, out_size=100, batch_size=100, nonhybrid=True):
-
-        print("2????\n\n\n")
-
         self.hidden_size = hidden_size
         self.out_size = out_size
         self.batch_size = batch_size
@@ -35,7 +32,6 @@ class Model(object):
         self.nasr_b = tf.get_variable('nasr_b', [self.out_size], dtype=tf.float32, initializer=tf.zeros_initializer())
 
     def forward(self, re_embedding, train=True): # re_embedding训练后的嵌入向量
-        print("3????\n\n\n")
 
         rm = tf.reduce_sum(self.mask, 1)  # mask每一行分别求和
         last_id = tf.gather_nd(self.alias,
@@ -72,14 +68,14 @@ class Model(object):
         return loss, logits
 
     def run(self, fetches, tar, item, adj_in, adj_out, alias, mask):
-        return self.sess.run(fetches, feed_dict={self.tar: tar, self.item: item, self.adj_in: adj_in,
-                                                 self.adj_out: adj_out, self.alias: alias, self.mask: mask})
+        Sess = self.sess.run(fetches, feed_dict={self.tar: tar, self.item: item, self.adj_in: adj_in, self.adj_out: adj_out, self.alias: alias, self.mask: mask})
+        return Sess
+
 
 
 class GGNN(Model):
     def __init__(self, hidden_size=100, out_size=100, batch_size=300, n_node=None,
                  lr=None, l2=None, step=1, decay=None, lr_dc=0.1, nonhybrid=False):
-        print("4????\n\n\n")
         super(GGNN, self).__init__(hidden_size, out_size, batch_size, nonhybrid)
         self.embedding = tf.get_variable(shape=[n_node, hidden_size], name='embedding', dtype=tf.float32,
                                          initializer=tf.random_uniform_initializer(-self.stdv, self.stdv))  # 每个节点的嵌入向量
@@ -102,6 +98,7 @@ class GGNN(Model):
         with tf.variable_scope('ggnn_model', reuse=True):
             self.loss_test, self.score_test = self.forward(self.ggnn(), train=False)
         self.global_step = tf.Variable(0)
+
         self.learning_rate = tf.train.exponential_decay(lr, global_step=self.global_step, decay_steps=decay,
                                                         decay_rate=lr_dc, staircase=True)   # 动态衰减的学习率
         self.opt = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss_train, global_step=self.global_step) # 学习到的参数
@@ -109,8 +106,13 @@ class GGNN(Model):
         config = tf.ConfigProto(gpu_options=gpu_options)
         config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=config)
-        writer = tf.summary.FileWriter('D:\\tf_dir\\tensorboard_study', self.sess.graph)
-        self.sess.run(tf.global_variables_initializer())
+        logdir='D:\\tf_dir\\tensorboard_study'
+        if tf.gfile.Exists(logdir):
+            tf.gfile.DeleteRecursively(logdir)
+        writer = tf.summary.FileWriter(logdir, self.sess.graph)
+        self.sess.run(tf.global_variables_initializer())  #初始化变量
+        # saver = tf.train.import_meta_graph("Model/model.ckpt.meta")
+        # saver.restore(self.sess, "./Model/model.ckpt")  # 注意路径写法
         writer.close()
 
     def ggnn(self):
@@ -129,3 +131,12 @@ class GGNN(Model):
                     tf.nn.dynamic_rnn(cell, tf.expand_dims(tf.reshape(av, [-1, 2 * self.out_size]), axis=1),
                                       initial_state=tf.reshape(fin_state, [-1, self.out_size]))
         return tf.reshape(fin_state, [self.batch_size, -1, self.out_size])
+    def reload(self, path = '../Model/model.ckpt.meta'):
+        saver = tf.train.Saver()
+        saver.restore(self.sess, "Model/model.ckpt")
+        # saver = tf.train.import_meta_graph("Model/model.ckpt.meta")
+        # saver.restore(self.sess, "/Model/model.ckpt")  # 注意路径写法
+        # print(self.nasr_b.eval())
+        # print(self.sess.run(self.nasr_w1))
+        # saver = tf.train.import_meta_graph('Model/model.ckpt.meta')
+        # saver.restore(self.sess, tf.train.latest_checkpoint("./Model.model.ckpt"))

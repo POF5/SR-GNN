@@ -76,6 +76,7 @@ class Data():
         n_batch = int(self.length / batch_size)
         if self.length % batch_size != 0:
             n_batch += 1
+        print("nbatch: " , n_batch,"???????")
         slices = np.split(np.arange(n_batch * batch_size), n_batch)
         slices[-1] = np.arange(self.length-batch_size, self.length)
         return slices
